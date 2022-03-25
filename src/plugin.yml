@@ -3,4 +3,4 @@ name: FallingCreeper
 main: tech.yfshadaow.FallingCreeper
 version: 1.0
 author: YFshadaow
-depend: [GameUtils]
+depend: [GameUtils,WorldEdit]
