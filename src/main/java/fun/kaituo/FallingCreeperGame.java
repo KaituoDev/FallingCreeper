@@ -1,4 +1,4 @@
-package tech.yfshadaow;
+package fun.kaituo;
 
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
@@ -11,6 +11,9 @@ import com.sk89q.worldedit.function.operation.Operation;
 import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
+import fun.kaituo.event.PlayerChangeGameEvent;
+import fun.kaituo.event.PlayerEndGameEvent;
+import fun.kaituo.utils.ItemStackBuilder;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -25,7 +28,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -36,7 +38,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -45,7 +46,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 
-import static tech.yfshadaow.GameUtils.world;
+import static fun.kaituo.GameUtils.world;
 
 public class FallingCreeperGame extends Game implements Listener {
 
@@ -57,6 +58,7 @@ public class FallingCreeperGame extends Game implements Listener {
     List<Creeper> creepers;
     List<Block> blocks;
     int spawnFrequency;
+    int countDownSeconds = 5;
 
     private FallingCreeperGame(FallingCreeper plugin) {
         rod = new ItemStackBuilder(Material.BLAZE_ROD).setDisplayName("§e击退棒").setLore("§b把苦力怕推向你的对手！").addEnchantment(Enchantment.KNOCKBACK, 3, true).build();
@@ -64,10 +66,11 @@ public class FallingCreeperGame extends Game implements Listener {
         random = new Random();
         creepers = new ArrayList<>();
         blocks = new ArrayList<>();
-        players = plugin.players;
+        players = FallingCreeper.players;
         playersAlive = new ArrayList<>();
-        initGame(plugin, "FallingCreeper", "§e天降苦力怕", 10, new Location(world, 1000, 13, 2004), BlockFace.NORTH,
-                new Location(world, 996, 13, 2000), BlockFace.EAST, new Location(world, 1000, 12, 2000), new BoundingBox(700, -64, 1300, 1700, 320, 2300));
+        initializeGame(plugin, "FallingCreeper", "§e天降苦力怕", new Location(world, 1000, 12, 2000), new BoundingBox(700, -64, 1300, 1700, 320, 2300));
+        initializeButtons(new Location(world, 1000, 13, 2004), BlockFace.NORTH,
+                new Location(world, 996, 13, 2000), BlockFace.EAST);
     }
 
 
@@ -89,6 +92,7 @@ public class FallingCreeperGame extends Game implements Listener {
             }
         }
     }
+
     @EventHandler
     public void preventDamage(EntityDamageByEntityEvent edbee) {
         if (edbee.getEntity() instanceof Creeper && edbee.getDamager() instanceof Player) {
@@ -100,6 +104,7 @@ public class FallingCreeperGame extends Game implements Listener {
             }
         }
     }
+
     @EventHandler
     public void onEntityDamage(EntityDamageEvent ede) {
         if (creepers.contains(ede.getEntity())) {
@@ -130,10 +135,10 @@ public class FallingCreeperGame extends Game implements Listener {
     }
 
     @Override
-    protected void initGameRunnable() {
+    protected void initializeGameRunnable() {
         gameRunnable = () -> {
             spawnFrequency = FallingCreeper.spawnFrequency;
-            Collection<Player> startingPlayers = getStartingPlayers();
+            Collection<Player> startingPlayers = getPlayersNearHub(50, 50, 50);
             players.addAll(startingPlayers);
             playersAlive.addAll(startingPlayers);
             if (players.size() < 2) {
@@ -143,8 +148,8 @@ public class FallingCreeperGame extends Game implements Listener {
                 players.clear();
                 playersAlive.clear();
             } else {
-                for (int x = 985; x <= 1016; x ++) {
-                    for (int z = 1985; z <= 2016; z ++) {
+                for (int x = 985; x <= 1016; x++) {
+                    for (int z = 1985; z <= 2016; z++) {
                         blocks.add(world.getBlockAt(x, 99, z));
                     }
                 }
@@ -152,7 +157,7 @@ public class FallingCreeperGame extends Game implements Listener {
                 Bukkit.getPluginManager().registerEvents(this, plugin);
                 removeStartButton();
                 placeSpectateButton();
-                startCountdown();
+                startCountdown(countDownSeconds);
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     for (Player p : players) {
                         p.teleport(new Location(world, 1000.5, 100.0, 2000.5));
@@ -174,7 +179,7 @@ public class FallingCreeperGame extends Game implements Listener {
                     l.setY(128);
                     l.setYaw((float) ((random.nextDouble() - 0.5) * 2 * 180));
                     Creeper c = world.spawn(l, Creeper.class);
-                    Bukkit.getScheduler().runTaskLater(plugin, ()-> {
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (!c.isDead()) {
                             c.setGravity(false);
                             /*
@@ -196,8 +201,11 @@ public class FallingCreeperGame extends Game implements Listener {
                              */
                         }
                     }, 20);
-                    c.setMaxFuseTicks(75);
-                    c.ignite();
+                    c.setMaxFuseTicks(30);
+                    //c.ignite();
+
+                    Bukkit.getScheduler().runTaskLater(plugin, c::ignite, 20);
+
                     c.setAware(false);
                     if (random.nextInt(10) == 0) {
                         c.setPowered(true);
@@ -274,11 +282,7 @@ public class FallingCreeperGame extends Game implements Listener {
                         }, 100);
                         players.clear();
                         playersAlive.clear();
-                        List<Integer> taskIdsCopy = new ArrayList<>(taskIds);
-                        taskIds.clear();
-                        for (int i : taskIdsCopy) {
-                            Bukkit.getScheduler().cancelTask(i);
-                        }
+                        cancelGameTasks();
                     }
 
                 }, countDownSeconds * 20L, 1));

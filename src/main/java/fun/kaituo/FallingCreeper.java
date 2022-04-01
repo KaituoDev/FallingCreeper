@@ -1,5 +1,6 @@
-package tech.yfshadaow;
+package fun.kaituo;
 
+import fun.kaituo.event.PlayerChangeGameEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -16,8 +17,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.ArrayList;
 import java.util.List;
 
-import static tech.yfshadaow.GameUtils.unregisterGame;
-import static tech.yfshadaow.GameUtils.world;
+import static fun.kaituo.GameUtils.unregisterGame;
+import static fun.kaituo.GameUtils.world;
 
 public class FallingCreeper extends JavaPlugin implements Listener {
 
@@ -68,7 +69,7 @@ public class FallingCreeper extends JavaPlugin implements Listener {
                 }
             }
             Sign sign = (Sign) pie.getClickedBlock().getState();
-            sign.setLine(3,   spawnFrequency + " 刻生成1只");
+            sign.setLine(3, spawnFrequency + " 刻生成1只");
             sign.update();
         }
     }
@@ -80,7 +81,7 @@ public class FallingCreeper extends JavaPlugin implements Listener {
         Bukkit.getPluginManager().registerEvents(this, this);
         GameUtils.registerGame(getGameInstance());
         Sign sign = (Sign) world.getBlockAt(1000, 14, 2004).getState();
-        sign.setLine(3,  + spawnFrequency + " 刻生成1只");
+        sign.setLine(3, +spawnFrequency + " 刻生成1只");
         sign.update();
     }
 
