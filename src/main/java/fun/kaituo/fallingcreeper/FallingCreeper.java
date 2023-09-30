@@ -1,6 +1,8 @@
-package fun.kaituo;
+package fun.kaituo.fallingcreeper;
 
-import fun.kaituo.event.PlayerChangeGameEvent;
+import fun.kaituo.gameutils.Game;
+import fun.kaituo.gameutils.GameUtils;
+import fun.kaituo.gameutils.event.PlayerChangeGameEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -17,10 +19,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.ArrayList;
 import java.util.List;
 
-import static fun.kaituo.GameUtils.unregisterGame;
-import static fun.kaituo.GameUtils.world;
 
 public class FallingCreeper extends JavaPlugin implements Listener {
+    private GameUtils gameUtils;
 
     static List<Player> players;
     static int spawnFrequency;
@@ -38,7 +39,7 @@ public class FallingCreeper extends JavaPlugin implements Listener {
         if (!pie.getClickedBlock().getType().equals(Material.OAK_BUTTON)) {
             return;
         }
-        if (pie.getClickedBlock().getLocation().equals(new Location(world, 1000, 13, 2004))) {
+        if (pie.getClickedBlock().getLocation().equals(new Location(gameUtils.getWorld(), 1000, 13, 2004))) {
             FallingCreeperGame.getInstance().startGame();
         }
     }
@@ -76,11 +77,12 @@ public class FallingCreeper extends JavaPlugin implements Listener {
 
 
     public void onEnable() {
+        gameUtils = (GameUtils) Bukkit.getPluginManager().getPlugin("GameUtils");
         players = new ArrayList<>();
         spawnFrequency = 40;
         Bukkit.getPluginManager().registerEvents(this, this);
-        GameUtils.registerGame(getGameInstance());
-        Sign sign = (Sign) world.getBlockAt(1000, 14, 2004).getState();
+        gameUtils.registerGame(getGameInstance());
+        Sign sign = (Sign) gameUtils.getWorld().getBlockAt(1000, 14, 2004).getState();
         sign.setLine(3, +spawnFrequency + " 刻生成1只");
         sign.update();
     }
@@ -88,12 +90,11 @@ public class FallingCreeper extends JavaPlugin implements Listener {
     public void onDisable() {
         Bukkit.getScheduler().cancelTasks(this);
         HandlerList.unregisterAll((Plugin) this);
-        if (players.size() > 0) {
-            for (Player p : players) {
-                p.teleport(new Location(world, 0.5, 89.0, 0.5));
-                Bukkit.getPluginManager().callEvent(new PlayerChangeGameEvent(p, getGameInstance(), null));
+        for (Player p: Bukkit.getOnlinePlayers()) {
+            if (gameUtils.getPlayerGame(p) == getGameInstance()) {
+                Bukkit.dispatchCommand(p, "join Lobby");
             }
         }
-        unregisterGame(getGameInstance());
+        gameUtils.unregisterGame(getGameInstance());
     }
 }

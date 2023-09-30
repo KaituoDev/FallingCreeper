@@ -1,4 +1,4 @@
-package fun.kaituo;
+package fun.kaituo.fallingcreeper;
 
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.WorldEdit;
@@ -11,9 +11,10 @@ import com.sk89q.worldedit.function.operation.Operation;
 import com.sk89q.worldedit.function.operation.Operations;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.session.ClipboardHolder;
-import fun.kaituo.event.PlayerChangeGameEvent;
-import fun.kaituo.event.PlayerEndGameEvent;
-import fun.kaituo.utils.ItemStackBuilder;
+import fun.kaituo.gameutils.Game;
+import fun.kaituo.gameutils.event.PlayerChangeGameEvent;
+import fun.kaituo.gameutils.event.PlayerEndGameEvent;
+import fun.kaituo.gameutils.utils.ItemStackBuilder;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -46,7 +47,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 
-import static fun.kaituo.GameUtils.world;
 
 public class FallingCreeperGame extends Game implements Listener {
 
@@ -60,6 +60,8 @@ public class FallingCreeperGame extends Game implements Listener {
     int spawnFrequency;
     int countDownSeconds = 5;
 
+    private final BoundingBox gameBoundingBox = new BoundingBox(700, -64, 1300, 1700, 320, 2300);
+
     private FallingCreeperGame(FallingCreeper plugin) {
         rod = new ItemStackBuilder(Material.BLAZE_ROD).setDisplayName("§e击退棒").setLore("§b把苦力怕推向你的对手！").addEnchantment(Enchantment.KNOCKBACK, 3, true).build();
         this.plugin = plugin;
@@ -68,9 +70,10 @@ public class FallingCreeperGame extends Game implements Listener {
         blocks = new ArrayList<>();
         players = FallingCreeper.players;
         playersAlive = new ArrayList<>();
-        initializeGame(plugin, "FallingCreeper", "§e天降苦力怕", new Location(world, 1000, 12, 2000), new BoundingBox(700, -64, 1300, 1700, 320, 2300));
+        initializeGame(plugin, "FallingCreeper", "§e天降苦力怕", new Location(world, 1000, 12, 2000));
         initializeButtons(new Location(world, 1000, 13, 2004), BlockFace.NORTH,
                 new Location(world, 996, 13, 2000), BlockFace.EAST);
+        initializeGameRunnable();
     }
 
 
@@ -134,8 +137,7 @@ public class FallingCreeperGame extends Game implements Listener {
         playersAlive.remove(pcge.getPlayer());
     }
 
-    @Override
-    protected void initializeGameRunnable() {
+    private void initializeGameRunnable() {
         gameRunnable = () -> {
             spawnFrequency = FallingCreeper.spawnFrequency;
             Collection<Player> startingPlayers = getPlayersNearHub(50, 50, 50);
@@ -291,15 +293,55 @@ public class FallingCreeperGame extends Game implements Listener {
     }
 
     @Override
-    protected void savePlayerQuitData(Player p) throws IOException {
+    protected void quit(Player p) throws IOException {
         players.remove(p);
         playersAlive.remove(p);
     }
 
 
     @Override
-    protected void rejoin(Player player) {
+    protected boolean rejoin(Player player) {
+        return false;
+    }
 
+    @Override
+    protected boolean join(Player player) {
+        player.setBedSpawnLocation(hubLocation, true);
+        player.teleport(hubLocation);
+        return true;
+    }
+
+    @Override
+    protected void forceStop() {
+        if (playersAlive.isEmpty()) {
+            return;
+        }
+        for (Creeper c : creepers) {
+            if (c != null) {
+                if (!c.isDead()) {
+                    c.remove();
+                }
+            }
+        }
+        creepers.clear();
+        blocks.clear();
+        List<Player> playersCopy = new ArrayList<>(players);
+        for (Player p : playersCopy) {
+            p.sendTitle("§c游戏被强制终止", null, 5, 50, 5);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                p.teleport(new Location(world, 1000.5, 12, 2000.5));
+                Bukkit.getPluginManager().callEvent(new PlayerEndGameEvent(p, this));
+                pasteSchematic("fallingcreeperempty", 1000, 100, 2000, false);
+            }, 100);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            placeStartButton();
+            removeSpectateButton();
+            HandlerList.unregisterAll(this);
+        }, 100);
+        players.clear();
+        playersAlive.clear();
+        cancelGameTasks();
     }
 
     private void pasteSchematic(String name, double x, double y, double z, boolean ignoreAir) {
