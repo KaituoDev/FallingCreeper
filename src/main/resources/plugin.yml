@@ -1,6 +1,6 @@
 api-version: 1.13
 name: FallingCreeper
 main: fun.kaituo.fallingcreeper.FallingCreeper
-version: 1.1
+version: 2.0
 author: YFshadaow
-depend: [GameUtils,WorldEdit]
+depend: [GameUtils]
